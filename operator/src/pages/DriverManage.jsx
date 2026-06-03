@@ -1,38 +1,25 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext.jsx';
-import { localStore } from '../lib/localStore.js';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { useState, useEffect, useCallback } from 'react';
+import api from '../lib/api.js';
 
 export default function DriverManage() {
-  const { getToken } = useAuth();
   const [drivers, setDrivers] = useState([]);
   const [filter, setFilter] = useState({ search: '', status: '' });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => { loadDrivers(); }, []);
-
-  const loadDrivers = async () => {
+  const loadDrivers = useCallback(async () => {
     setLoading(true);
-    let allDrivers = [];
-
-    // Try API first
+    setError('');
     try {
-      const token = getToken();
-      if (token) {
-        const res = await fetch(`${API_URL}/drivers`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res.ok) { const data = await res.json(); allDrivers = data.drivers || []; }
-      }
-    } catch { /* API unavailable */ }
-
-    // Merge with localStore drivers (show all drivers created via Add Driver page)
-    const localDrivers = localStore.getDrivers();
-    const apiIds = new Set(allDrivers.map(d => d._id));
-    const merged = [...allDrivers, ...localDrivers.filter(d => !apiIds.has(d._id))];
-
-    setDrivers(merged);
+      const data = await api.getDrivers();
+      setDrivers(data.drivers || []);
+    } catch (err) {
+      setError(err.message);
+    }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => { loadDrivers(); }, [loadDrivers]);
 
   const statusBadge = (status) => {
     switch (status) {
@@ -44,21 +31,14 @@ export default function DriverManage() {
     }
   };
 
-  const standingBadge = (standing) => {
-    switch (standing) {
-      case 'good standing': return 'text-green-600 text-xs';
-      case 'probation': return 'text-orange-600 text-xs';
-      case 'suspension': return 'text-red-600 text-xs';
-      default: return 'text-gray-500 text-xs';
-    }
-  };
-
   const filteredDrivers = drivers.filter(d => {
-    const matchesSearch = !filter.search ||
-      d.fullName?.toLowerCase().includes(filter.search.toLowerCase()) ||
-      d.driverId?.toLowerCase().includes(filter.search.toLowerCase()) ||
-      d.plateNumber?.toLowerCase().includes(filter.search.toLowerCase()) ||
-      d.accessToken?.toLowerCase().includes(filter.search.toLowerCase());
+    const q = filter.search.toLowerCase();
+    const matchesSearch = !q ||
+      d.fullName?.toLowerCase().includes(q) ||
+      d.driverId?.toLowerCase().includes(q) ||
+      d.plateNumber?.toLowerCase().includes(q) ||
+      d.accessToken?.toLowerCase().includes(q) ||
+      d.email?.toLowerCase().includes(q);
     const matchesStatus = !filter.status || d.status === filter.status;
     return matchesSearch && matchesStatus;
   });
@@ -67,13 +47,15 @@ export default function DriverManage() {
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start gap-3 mb-4 md:mb-6">
         <div>
-          <h1 className="text-xl md:text-2xl font-semibold">Driver Management</h1>
-          <p className="text-sm text-gray-600">All drivers and their complete information.</p>
+          <h1 className="text-xl md:text-2xl font-semibold">All Drivers</h1>
+          <p className="text-sm text-gray-600">Complete driver profiles with access tokens and vehicle details.</p>
         </div>
       </div>
 
+      {error && <div className="bg-red-50 text-red-600 text-sm p-3 mb-4 rounded">{error}</div>}
+
       {/* Filters */}
-      <div className="bg-white border border-gray-300 p-4 md:p-6 mb-4 md:mb-6">
+      <div className="bg-white border border-gray-300 p-4 md:p-6 mb-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div><label className="block text-xs font-medium text-gray-500 uppercase mb-1">Search</label><input type="text" className="border border-gray-300 px-4 py-2 w-full text-sm outline-none focus:border-blue-600" placeholder="Name, ID, plate, token..." value={filter.search} onChange={e => setFilter(p => ({ ...p, search: e.target.value }))} /></div>
           <div><label className="block text-xs font-medium text-gray-500 uppercase mb-1">Status</label><select className="border border-gray-300 px-4 py-2 w-full text-sm outline-none focus:border-blue-600 bg-white" value={filter.status} onChange={e => setFilter(p => ({ ...p, status: e.target.value }))}><option value="">All</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option><option value="probation">Probation</option></select></div>
@@ -84,10 +66,8 @@ export default function DriverManage() {
         </div>
       </div>
 
-      {/* Driver count */}
       <p className="text-sm text-gray-600 mb-3">{filteredDrivers.length} driver{filteredDrivers.length !== 1 ? 's' : ''} found</p>
 
-      {/* Driver cards */}
       {filteredDrivers.length === 0 ? (
         <div className="bg-white border border-gray-300 p-8 text-center">
           <p className="text-gray-500 text-sm">{loading ? 'Loading drivers...' : 'No drivers found. Add drivers from the Add Driver page.'}</p>
@@ -96,7 +76,7 @@ export default function DriverManage() {
         <div className="space-y-4">
           {filteredDrivers.map(driver => (
             <div key={driver._id} className="bg-white border border-gray-300 p-4 md:p-6">
-              {/* Header row */}
+              {/* Header */}
               <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-4 pb-3 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-white text-sm font-bold">
@@ -109,13 +89,15 @@ export default function DriverManage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={statusBadge(driver.status)}>{driver.status || 'unknown'}</span>
-                  <span className={standingBadge(driver.standing)}>{driver.standing || '--'}</span>
+                  <span className="text-xs text-gray-500">{driver.standing || '--'}</span>
                 </div>
               </div>
 
-              {/* Details grid */}
+              {/* Full Details Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 text-sm">
-                <div><span className="text-xs text-gray-500 uppercase block">Access Token</span><span className="font-mono text-xs bg-gray-100 px-2 py-1 inline-block mt-0.5">{driver.accessToken || 'N/A'}</span></div>
+                <div><span className="text-xs text-gray-500 uppercase block">Access Token</span>
+                  <span className="font-mono text-xs bg-yellow-50 border border-yellow-200 px-2 py-1 inline-block mt-0.5 text-gray-800">{driver.accessToken || 'N/A'}</span>
+                </div>
                 <div><span className="text-xs text-gray-500 uppercase block">Phone</span><span className="font-medium">{driver.phoneNumber || '--'}</span></div>
                 <div><span className="text-xs text-gray-500 uppercase block">Email</span><span className="font-medium">{driver.email || '--'}</span></div>
                 <div><span className="text-xs text-gray-500 uppercase block">Plate Number</span><span className="font-medium">{driver.plateNumber || '--'}</span></div>

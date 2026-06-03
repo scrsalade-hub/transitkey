@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { api } from '../lib/api.js';
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -13,17 +12,23 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Check localStorage fallback
+    const storedUsers = JSON.parse(localStorage.getItem('transitkey_passengers') || '[]');
+    const found = storedUsers.find(u => u.email === form.email && u.password === form.password);
+    if (found) {
+      login({ token: 'local_p_' + Date.now(), user: found });
+      navigate('/');
+      return;
+    }
+
     try {
-      const res = await fetch(`${API_URL}/auth/passenger/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Login failed');
+      const data = await api.login(form);
       login(data);
       navigate('/');
-    } catch (err) { setError(err.message); }
+    } catch (err) {
+      setError(err.message || 'Invalid credentials.');
+    }
   };
 
   return (

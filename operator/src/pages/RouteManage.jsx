@@ -1,14 +1,25 @@
 import { useState, useEffect } from 'react';
-import { localStore } from '../lib/localStore.js';
+import { api } from '../lib/api.js';
 
 export default function RouteManage() {
   const [routes, setRoutes] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', startTerminal: '', endTerminal: '', distance: '', estimatedDuration: '', fare: '', stops: [{ name: '', estimatedArrival: '' }] });
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({
+    name: '', startTerminal: '', endTerminal: '', distance: '', estimatedDuration: '', fare: '',
+    stops: [{ name: '', estimatedArrival: '' }]
+  });
 
-  useEffect(() => {
-    setRoutes(localStore.getRoutes());
-  }, []);
+  useEffect(() => { fetchRoutes(); }, []);
+
+  const fetchRoutes = async () => {
+    setLoading(true);
+    try {
+      const data = await api.getRoutes();
+      setRoutes(data || []);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
 
   const handleAddStop = () => {
     setForm(p => ({ ...p, stops: [...p.stops, { name: '', estimatedArrival: '' }] }));
@@ -20,9 +31,14 @@ export default function RouteManage() {
     setForm(p => ({ ...p, stops: newStops }));
   };
 
-  const handleSubmit = (e) => {
+  const handleRemoveStop = (i) => {
+    if (form.stops.length <= 1) return;
+    setForm(p => ({ ...p, stops: p.stops.filter((_, idx) => idx !== i) }));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const route = {
+    const routeData = {
       name: form.name,
       routeId: 'RTE-' + Math.floor(100 + Math.random() * 900),
       startTerminal: form.startTerminal,
@@ -30,12 +46,15 @@ export default function RouteManage() {
       distance: parseFloat(form.distance),
       estimatedDuration: parseFloat(form.estimatedDuration),
       fare: parseFloat(form.fare),
+      status: 'active',
       stops: form.stops.filter(s => s.name.trim()),
     };
-    localStore.addRoute(route);
-    setRoutes(localStore.getRoutes());
-    setShowForm(false);
-    setForm({ name: '', startTerminal: '', endTerminal: '', distance: '', estimatedDuration: '', fare: '', stops: [{ name: '', estimatedArrival: '' }] });
+    try {
+      await api.createRoute(routeData);
+      await fetchRoutes();
+      setShowForm(false);
+      setForm({ name: '', startTerminal: '', endTerminal: '', distance: '', estimatedDuration: '', fare: '', stops: [{ name: '', estimatedArrival: '' }] });
+    } catch (err) { alert('Failed to create route: ' + err.message); }
   };
 
   return (
@@ -57,16 +76,17 @@ export default function RouteManage() {
             <div><label className="block text-xs font-medium text-gray-500 uppercase mb-1">End Terminal</label><input type="text" className="border border-gray-300 px-4 py-3 w-full text-sm outline-none focus:border-blue-600" value={form.endTerminal} onChange={e => setForm(p => ({ ...p, endTerminal: e.target.value }))} required /></div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div><label className="block text-xs font-medium text-gray-500 uppercase mb-1">Distance (km)</label><input type="number" className="border border-gray-300 px-4 py-3 w-full text-sm outline-none focus:border-blue-600" value={form.distance} onChange={e => setForm(p => ({ ...p, distance: e.target.value }))} required /></div>
+            <div><label className="block text-xs font-medium text-gray-500 uppercase mb-1">Distance (km)</label><input type="number" step="0.1" className="border border-gray-300 px-4 py-3 w-full text-sm outline-none focus:border-blue-600" value={form.distance} onChange={e => setForm(p => ({ ...p, distance: e.target.value }))} required /></div>
             <div><label className="block text-xs font-medium text-gray-500 uppercase mb-1">Duration (mins)</label><input type="number" className="border border-gray-300 px-4 py-3 w-full text-sm outline-none focus:border-blue-600" value={form.estimatedDuration} onChange={e => setForm(p => ({ ...p, estimatedDuration: e.target.value }))} required /></div>
             <div><label className="block text-xs font-medium text-gray-500 uppercase mb-1">Fare (#)</label><input type="number" className="border border-gray-300 px-4 py-3 w-full text-sm outline-none focus:border-blue-600" value={form.fare} onChange={e => setForm(p => ({ ...p, fare: e.target.value }))} required /></div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 uppercase mb-2">Stops</label>
             {form.stops.map((stop, i) => (
-              <div key={i} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
+              <div key={i} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2 items-end">
                 <input type="text" className="border border-gray-300 px-4 py-3 w-full text-sm outline-none focus:border-blue-600" placeholder="Stop name" value={stop.name} onChange={e => handleStopChange(i, 'name', e.target.value)} />
                 <input type="text" className="border border-gray-300 px-4 py-3 w-full text-sm outline-none focus:border-blue-600" placeholder="ETA e.g. 08:30 AM" value={stop.estimatedArrival} onChange={e => handleStopChange(i, 'estimatedArrival', e.target.value)} />
+                <button type="button" onClick={() => handleRemoveStop(i)} className="text-red-600 text-sm hover:underline text-left">Remove</button>
               </div>
             ))}
             <button type="button" onClick={handleAddStop} className="text-blue-600 text-sm hover:underline mt-1">+ Add another stop</button>
@@ -99,12 +119,12 @@ export default function RouteManage() {
                 <td className="py-3 px-2 text-sm">{route.startTerminal}</td>
                 <td className="py-3 px-2 text-sm">{route.endTerminal}</td>
                 <td className="py-3 px-2 text-sm">{route.stops?.length || 0}</td>
-                <td className="py-3 px-2 text-sm">#{route.fare || 0}</td>
-                <td className="py-3 px-2"><span className="border border-green-500 text-green-700 px-2 py-0.5 text-xs">{route.status}</span></td>
+                <td className="py-3 px-2 text-sm">#{route.fare?.toLocaleString() || 0}</td>
+                <td className="py-3 px-2"><span className={`border px-2 py-0.5 text-xs ${route.status === 'active' ? 'border-green-500 text-green-700' : 'border-gray-400 text-gray-700'}`}>{route.status}</span></td>
               </tr>
             ))}
             {routes.length === 0 && (
-              <tr><td colSpan="7" className="py-8 text-center text-gray-500 text-sm">No routes created yet. Click &quot;Add New Route&quot; to get started.</td></tr>
+              <tr><td colSpan="7" className="py-8 text-center text-gray-500 text-sm">{loading ? 'Loading routes...' : 'No routes created yet. Click "Add New Route" to get started.'}</td></tr>
             )}
           </tbody>
         </table>

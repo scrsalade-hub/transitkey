@@ -3,11 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
-import { seedInitialData } from './lib/localStore.js'
 import './index.css'
-
-// Seed initial data for demo route/trip
-seedInitialData();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

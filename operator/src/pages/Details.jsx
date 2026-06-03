@@ -15,11 +15,11 @@ export default function Details() {
       const [tripsData, routesData, driversData] = await Promise.all([
         api.getTrips().catch(() => ({ trips: [] })),
         api.getRoutes().catch(() => []),
-        api.getDrivers().catch(() => []),
+        api.getDrivers().catch(() => ({ drivers: [] })),
       ]);
       setTrips(tripsData.trips || tripsData || []);
-      setRoutes(routesData || []);
-      setDrivers(driversData || []);
+      setRoutes(Array.isArray(routesData) ? routesData : (routesData.routes || []));
+      setDrivers(Array.isArray(driversData) ? driversData : (driversData.drivers || []));
     } catch (e) { console.error(e); }
     setLoading(false);
   };

@@ -31,6 +31,13 @@ async function apiFetch(path, options = {}) {
   return res.text();
 }
 
+// Helper to extract array from API responses that may be {key: [...]} or [...]
+function toArray(data, key) {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data[key])) return data[key];
+  return [];
+}
+
 export const api = {
   // Auth
   register: (body) => apiFetch('/auth/operator/register', { method: 'POST', body }),

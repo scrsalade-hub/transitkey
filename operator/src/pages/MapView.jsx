@@ -18,7 +18,7 @@ export default function MapView() {
       ]);
       const allTrips = tripsData.trips || tripsData || [];
       setTrips(allTrips);
-      setRoutes(routesData || []);
+      setRoutes(Array.isArray(routesData) ? routesData : (routesData.routes || []));
       const active = allTrips.filter(t => t.status === 'in_progress');
       if (active.length > 0) setSelectedTrip(active[0]);
     } catch (e) { console.error(e); }

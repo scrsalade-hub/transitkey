@@ -30,7 +30,7 @@ export default function MapView() {
       // Only show active trips on map
       const activeTrips = allTrips.filter(t => t.status === 'in_progress');
       setTrips(activeTrips);
-      setRoutes(routesData || []);
+      setRoutes(Array.isArray(routesData) ? routesData : (routesData.routes || []));
       if (focusTripId) {
         const focused = activeTrips.find(t => t._id === focusTripId);
         if (focused) setSelectedTrip(focused);

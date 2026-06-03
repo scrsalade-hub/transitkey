@@ -25,7 +25,7 @@ export default function Home() {
         scheduled: allTrips.filter(t => t.status === 'scheduled').length,
         completed: allTrips.filter(t => t.status === 'completed').length,
         totalDrivers: (driversData.drivers || []).length,
-        totalRoutes: (Array.isArray(routesData) ? routesData : []).length,
+        totalRoutes: (Array.isArray(routesData) ? routesData : (routesData.routes || [])).length,
         openComplaints: (complaintsData.complaints || []).filter(c => c.status === 'open').length,
       });
     } catch (err) {

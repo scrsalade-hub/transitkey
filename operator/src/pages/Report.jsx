@@ -32,12 +32,12 @@ export default function Report() {
     try {
       const [tripsData, driversData, routesData] = await Promise.all([
         api.getTrips().catch(() => ({ trips: [] })),
-        api.getDrivers().catch(() => []),
+        api.getDrivers().catch(() => ({ drivers: [] })),
         api.getRoutes().catch(() => []),
       ]);
       setTrips(tripsData.trips || tripsData || []);
-      setDrivers(driversData || []);
-      setRoutes(routesData || []);
+      setDrivers(Array.isArray(driversData) ? driversData : (driversData.drivers || []));
+      setRoutes(Array.isArray(routesData) ? routesData : (routesData.routes || []));
     } catch (e) { console.error(e); }
 
     setLoading(false);
